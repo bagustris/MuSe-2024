@@ -67,6 +67,7 @@ def write_predictions(task, full_metas, full_preds, full_labels, prediction_path
     prediction_df['prediction'] = preds_flat
     prediction_df['label'] = labels_flat
     prediction_df.to_csv(os.path.join(prediction_path, filename), index=False)
+    print(f'Wrote predictions for {task} to {prediction_path}/{filename}')
 
 
 def get_predictions(model, task, data_loader, use_gpu=False):

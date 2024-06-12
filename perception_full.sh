@@ -14,7 +14,7 @@ n_seeds=5
 dropouts=(0.4)
 
 # adapt
-csv='../csvs/perception_baseline.csv'
+csv='./csvs/perception_baseline.csv'
 
 for feature in "${features[@]}"; do
     # RNN
@@ -23,7 +23,20 @@ for feature in "${features[@]}"; do
             for lr in "${lrs[@]}";do
                 for dropout in "${dropouts[@]}";do
                     for label in "${labels[@]}"; do
-                        python3 main.py --task perception --use_gpu --feature $feature --model_dim $model_dim --label_dim "$label" --rnn_n_layers $num_rnn_layers --lr "$lr" --n_seeds "$n_seeds" --result_csv "$csv" --linear_dropout $dropout --rnn_dropout $dropout --early_stopping_patience 10
+                        python3 main.py \
+                        --task perception \
+                        --use_gpu True \
+                        --feature $feature \
+                        --model_dim $model_dim \
+                        --label_dim "$label" \
+                        --rnn_n_layers $num_rnn_layers \
+                        --lr "$lr" \
+                        --n_seeds "$n_seeds" \
+                        # --result_csv "$csv" \
+                        --predict True \
+                        --linear_dropout $dropout \
+                        --rnn_dropout $dropout \
+                        --early_stopping_patience 10
                     done
                     done
                 done

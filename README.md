@@ -19,7 +19,11 @@ For details, please see the [Baseline Paper](https://www.researchgate.net/public
 It is highly recommended to run everything in a Python virtual environment. Please make sure to install the packages listed 
 in ``requirements.txt`` and adjust the paths in `config.py` (especially ``BASE_PATH`` and ``HUMOR_PATH`` and/or ``PERCEPTION_PATH``, respectively). 
 
-You can then, e.g., run the unimodal baseline reproduction calls in the ``*_full.sh`` file provided for each sub-challenge.
+You can then, e.g., run the unimodal baseline reproduction calls in the ``*_bagus.sh`` file provided for each sub-challenge.  
+
+```bash
+$ ./perception_bagus.sh
+```
 
 ## Settings
 The ``main.py`` script is used for training and evaluating models.  Most important options:
@@ -42,9 +46,20 @@ For every challenge, a ``*_full.sh`` file is provided with the respective call (
 Moreover, you can directly load one of the checkpoints corresponding to the results in the baseline paper. Note that 
 the checkpoints are only available to registered participants. 
 
+
+### Prediction
+To predict test files, one can use the ``--predict`` option in ``main.py``. This will create prediction folders under the folder specified as the prediction directory in ``config.py``.
+
+```
+python3 main.py --predict --task perception --use_gpu --feature vit-fer
+```
+
+### Checkpoint model
 A checkpoint model can be loaded and evaluated as follows:
 
-`` main.py --task humor --feature faus --eval_model /your/checkpoint/directory/humor_faus/model_102.pth`` 
+``` 
+main.py --task humor --feature faus --eval_model /your/checkpoint/directory/humor_faus/model_102.pth
+``` 
 
 
 ### Late Fusion
@@ -56,13 +71,23 @@ Then, ``late_fusion.py`` merges these predictions:
 * ``--task``: choose either `humor` or `perception` 
 * ``--label_dim``: for MuSe-Perception, cf. ``PERCEPTION_LABELS`` in ``config.py``
 * ``--model_ids``: list of model IDs, whose predictions are to be merged. These predictions must first be created (``--predict`` in ``main.py`` or ``personalisation.py``). 
-  The model id is a folder under the ``{config.PREDICTION_DIR}/humor`` for humor and ``{config.PREDICTION_DIR}/perception/{label_dim}`` for perception. 
+  The `model_id` is a folder under the ``{config.PREDICTION_DIR}/humor`` for humor and ``{config.PREDICTION_FOLDER}/perception/{label_dim}`` for perception. 
   It is the parent folder of the folders named after the seeds (e.g. ``101``). These contain the files ``predictions_devel.csv`` and ``predictoins_test.csv``
 * ``--seeds``: seeds for the respective model IDs.  
 
+Example:  
+```
+$ python late_fusion.py --task perception --label_dim assertiv --model_ids RNN_2024-06-10-10-30_[vit-fer]_[64_1_False_64]_[0.0001_256] RNN_2024-06-10-10-33_[vit-fer]_[64_1_False_64]_[0.0001_256] --seeds 101
+```
+
+### Hyperparameter Tuning
+
+```
+python main.py --task perception --feature vit-fer --optuna
+```
+
 ### Model Checkpoints
 Checkpoints for the [Perception Sub-Challenge](https://mediastore.rz.uni-augsburg.de/get/Bm2Ds0KUNd/)
-
 Checkpoints for the [Humor Sub-Challenge](https://mediastore.rz.uni-augsburg.de/get/_Xvipe7oPO/)
 
 

@@ -46,7 +46,8 @@ def save_model(model, model_folder, id):
     return model_file
 
 
-def train_model(task, model, data_loader, epochs, lr, model_path, identifier, use_gpu, loss_fn, eval_fn,
+def train_model(task, model, data_loader, epochs, lr, model_path, identifier, 
+                use_gpu, loss_fn, eval_fn,
                 eval_metric_str, early_stopping_patience, regularization=0.0):
     train_loader, val_loader, test_loader = data_loader['train'], data_loader['devel'], data_loader['test']
 

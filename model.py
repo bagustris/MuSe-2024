@@ -5,23 +5,36 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 import torch.nn.functional as F
 from config import ACTIVATION_FUNCTIONS, device
 
-
 class RNN(nn.Module):
-    def __init__(self, d_in, d_out, n_layers=1, bi=True, dropout=0.2, n_to_1=False):
+    def __init__(self, d_in, d_out, n_layers=1, bi=True, dropout=0.2, n_to_1=False, rnn_type='gru'):
         super(RNN, self).__init__()
-        self.rnn = nn.GRU(input_size=d_in, hidden_size=d_out, bidirectional=bi, num_layers=n_layers, dropout=dropout)
+        if rnn_type == 'lstm':
+            self.rnn = nn.LSTM(input_size=d_in, hidden_size=d_out, bidirectional=bi, num_layers=n_layers, dropout=dropout)
+        elif rnn_type == 'gru':
+            self.rnn = nn.GRU(input_size=d_in, hidden_size=d_out, bidirectional=bi, num_layers=n_layers, dropout=dropout)
+        elif rnn_type == 'rnn':
+            self.rnn = nn.RNN(input_size=d_in, hidden_size=d_out, bidirectional=bi, num_layers=n_layers, dropout=dropout)
+        else:
+            raise ValueError('RNN type not supported')
+
         self.n_layers = n_layers
         self.d_out = d_out
         self.n_directions = 2 if bi else 1
         self.n_to_1 = n_to_1
+        # self.attention = Attention(d_out * self.n_directions)
 
     def forward(self, x, x_len):
         x_packed = pack_padded_sequence(x, x_len.cpu(), batch_first=True, enforce_sorted=False)
         rnn_enc = self.rnn(x_packed)
 
         if self.n_to_1:
-            # hiddenstates, h_n, only last layer
+            # last_item_from_packed(rnn_enc[0], x_len)
+            # last_seq_items = last_item_from_packed(rnn_enc[0], x_len)
+            # attn_weights = self.attention(last_seq_items, rnn_enc[0].data)
+            # context = attn_weights.bmm(rnn_enc[0].data.transpose(0, 1))
+            # return context.squeeze(1)
             return last_item_from_packed(rnn_enc[0], x_len)
+
 
         else:
             x_out = rnn_enc[0]
@@ -45,11 +58,14 @@ class OutLayer(nn.Module):
     def __init__(self, d_in, d_hidden, d_out, dropout=.0, bias=.0):
         super(OutLayer, self).__init__()
         self.fc_1 = nn.Sequential(nn.Linear(d_in, d_hidden), nn.ReLU(True), nn.Dropout(dropout))
+        # self.fc_2 = nn.Sequential(nn.Linear(d_hidden, d_hidden), nn.ReLU(True), nn.Dropout(dropout))
         self.fc_2 = nn.Linear(d_hidden, d_out)
         nn.init.constant_(self.fc_2.bias.data, bias)
 
     def forward(self, x):
-        y = self.fc_2(self.fc_1(x))
+        x = self.fc_1(x)
+        # x = self.fc_2(x)
+        y = self.fc_2(x)
         return y
 
 
@@ -77,5 +93,4 @@ class Model(nn.Module):
 
     def set_n_to_1(self, n_to_1):
         self.encoder.n_to_1 = n_to_1
-
 

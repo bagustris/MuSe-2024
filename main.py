@@ -21,6 +21,7 @@ from utils import Logger, seed_worker, log_results
 import optuna
 from optuna.samplers import TPESampler
 
+import logging
 
 def parse_args():
     parser = argparse.ArgumentParser(description="MuSe 2024.")
@@ -72,7 +73,7 @@ def parse_args():
         "--epochs",
         type=int,
         default=200,
-        help="Specify the number of epochs (default: 100).",
+        help="Specify the number of epochs (default: 200).",
     )
     parser.add_argument(
         "--batch_size",
@@ -160,6 +161,22 @@ def parse_args():
         help="Specify the RNN type to be used (default: gru).",
     )
 
+    # argument for activation function
+    parser.add_argument(
+        "--activation",
+        type=str,
+        default="relu",
+        choices=["relu", "gelu", "elu", "leakyrelu", "prelu", "rrelu", "mish"],
+        help="Specify the activation function to be used in the output layer (default: relu).",
+    )
+    
+    # add residual argument
+    parser.add_argument(
+        "--residual",
+        action="store_true",
+        help="Specify whether to use residual connections in the RNN (default: False).",
+    )
+
     # use optuna to tune hyperparameters above
     parser.add_argument(
         "--optuna",
@@ -218,7 +235,7 @@ def get_eval_fn(task):
 
 def objective(trial):
     args.model_dim = trial.suggest_int("model_dim", 32, 128)
-    args.rnn_n_layers = trial.suggest_int("rnn_n_layers", 1, 3)
+    args.rnn_n_layers = trial.suggest_int("rnn_n_layers", 1, 4)
     args.rnn_bi = trial.suggest_categorical("rnn_bi", [True, False])
     args.d_fc_out = trial.suggest_int("d_fc_out", 32, 128)
     args.rnn_dropout = trial.suggest_float("rnn_dropout", 0.1, 0.5)
@@ -228,6 +245,10 @@ def objective(trial):
     args.loss = trial.suggest_categorical("loss", ["mse", "mae", "ccc", "pcc"] if args.task == PERCEPTION else ["bce"])
     args.regularization = trial.suggest_float("regularization", 1e-5, 1e-2, log=True)
     args.rnn_type = trial.suggest_categorical("rnn_type", ["lstm", "gru", "rnn"])
+    args.patience = trial.suggest_int("patience", 5, 30)
+    args.max_epochs = trial.suggest_int("max_epochs", 10, 1000)
+    args.activation = trial.suggest_categorical("activation", ["relu", "gelu", "elu", "leakyrelu", "prelu", "rrelu", "mish"])
+    args.residual = trial.suggest_categorical("residual", [True, False])
 
     # Load data, create datasets, define loss and evaluation functions
     data = load_data(
@@ -522,12 +543,28 @@ def main(args):
         study = optuna.create_study(direction="maximize", sampler=TPESampler())
         study.optimize(objective, n_trials=100)  # Adjust the number of trials as needed
 
-        print("Best hyperparameters:")
-        print(study.best_params)
+        # print best value and best params
+        print(f"Best value: {study.best_value}")
+        print(f"Best hyperparameters:{study.best_params}")
+    
 
         # Set the best hyperparameters to args
         for key, value in study.best_params.items():
             setattr(args, key, value)
+
+        # save the best value and hyperparameters into csv via loggin
+        log = logging.getLogger("optuna")
+        log_dir = os.path.join(args.paths["logs"], "optuna")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        log_file = os.path.join(log_dir, f"{args.log_file_name}.log")
+        handler = logging.FileHandler(log_file)
+        handler.setLevel(logging.INFO)
+        log.info(f"Label: {args.label_dim}")
+        log.info(f"Best value: {study.best_value}")
+        # log.info(f"Args: {args}")
+        log.info(f"Best hyperparameters:{study.best_params}")
+        log.info("-----------------------------------------")
 
     print("Done.")
 

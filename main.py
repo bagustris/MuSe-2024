@@ -23,6 +23,7 @@ from optuna.samplers import TPESampler
 
 import logging
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="MuSe 2024.")
 
@@ -169,7 +170,7 @@ def parse_args():
         choices=["relu", "gelu", "elu", "leakyrelu", "prelu", "rrelu", "mish"],
         help="Specify the activation function to be used in the output layer (default: relu).",
     )
-    
+
     # add residual argument
     parser.add_argument(
         "--residual",
@@ -197,8 +198,10 @@ def pcc_loss(preds, labels):
     """Pearson correlation coefficient loss """
     var_preds = preds - torch.mean(preds)
     var_labels = labels - torch.mean(labels)
-    pcc = torch.sum(var_preds * var_labels) / (torch.sqrt(torch.sum(var_preds ** 2)) * torch.norm(torch.sum(var_labels ** 2)))
+    pcc = torch.sum(var_preds * var_labels) / (torch.sqrt(torch.sum(var_preds ** 2))
+                                               * torch.norm(torch.sum(var_labels ** 2)))
     return 1 - pcc
+
 
 def ccc_loss(preds, labels):
     """Concordance correlation coefficient loss"""
@@ -218,13 +221,13 @@ def get_loss_fn(task):
             return nn.MSELoss(reduction="mean"), "MSE"
         elif args.loss == "mae":
             return nn.L1Loss(reduction="mean"), "L1"
-        elif args.loss  == "pcc":
+        elif args.loss == "pcc":
             return pcc_loss, "PCC"
         elif args.loss == "ccc":
             return ccc_loss, "CCC"
         else:
             raise ValueError("Unknown loss function")
-    
+
 
 def get_eval_fn(task):
     if task == PERCEPTION:
@@ -242,12 +245,16 @@ def objective(trial):
     args.linear_dropout = trial.suggest_float("linear_dropout", 0.1, 0.5)
     args.lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
     args.batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
-    args.loss = trial.suggest_categorical("loss", ["mse", "mae", "ccc", "pcc"] if args.task == PERCEPTION else ["bce"])
-    args.regularization = trial.suggest_float("regularization", 1e-5, 1e-2, log=True)
-    args.rnn_type = trial.suggest_categorical("rnn_type", ["lstm", "gru", "rnn"])
+    args.loss = trial.suggest_categorical(
+        "loss", ["mse", "mae", "ccc", "pcc"] if args.task == PERCEPTION else ["bce"])
+    args.regularization = trial.suggest_float(
+        "regularization", 1e-5, 1e-2, log=True)
+    args.rnn_type = trial.suggest_categorical(
+        "rnn_type", ["lstm", "gru", "rnn"])
     args.patience = trial.suggest_int("patience", 5, 30)
     args.max_epochs = trial.suggest_int("max_epochs", 10, 1000)
-    args.activation = trial.suggest_categorical("activation", ["relu", "gelu", "elu", "leakyrelu", "prelu", "rrelu", "mish"])
+    args.activation = trial.suggest_categorical(
+        "activation", ["relu", "gelu", "elu", "leakyrelu", "prelu", "rrelu", "mish"])
     args.residual = trial.suggest_categorical("residual", [True, False])
 
     # Load data, create datasets, define loss and evaluation functions
@@ -259,7 +266,8 @@ def objective(trial):
         args.normalize,
         save=args.cache,
     )
-    datasets = {partition: MuSeDataset(data, partition) for partition in data.keys()}
+    datasets = {partition: MuSeDataset(data, partition)
+                for partition in data.keys()}
 
     loss_fn, loss_str = get_loss_fn(args.task)
     eval_fn, eval_str = get_eval_fn(args.task)
@@ -361,7 +369,8 @@ def main(args):
         args.normalize,
         save=args.cache,
     )
-    datasets = {partition: MuSeDataset(data, partition) for partition in data.keys()}
+    datasets = {partition: MuSeDataset(data, partition)
+                for partition in data.keys()}
 
     args.d_in = datasets["train"].get_feature_dim()
 
@@ -399,7 +408,8 @@ def main(args):
             model = Model(args)
 
             print("=" * 50)
-            print(f"Training model... [seed {seed}] for at most {args.epochs} epochs")
+            print(
+                f"Training model... [seed {seed}] for at most {args.epochs} epochs")
 
             val_loss, val_score, best_model_file = train_model(
                 args.task,
@@ -420,7 +430,7 @@ def main(args):
             model = torch.load(best_model_file)
 
             # run evaluation only if test labels are available
-            if not args.predict:  
+            if not args.predict:
                 test_loss, test_score = evaluate(
                     args.task,
                     model,
@@ -463,7 +473,8 @@ def main(args):
             )
 
     else:  # Evaluate existing model (No training)
-        model_file = os.path.join(args.paths["model"], f"model_{args.eval_seed}.pth")
+        model_file = os.path.join(
+            args.paths["model"], f"model_{args.eval_seed}.pth")
         model = torch.load(
             model_file,
             map_location=torch.device("cuda")
@@ -506,7 +517,7 @@ def main(args):
             )
             print(f"[Test {eval_str}]: {test_score:7.4f}")
 
-    # Make predictions for the test partition; 
+    # Make predictions for the test partition;
     # this option is set if there are no test labels
     if args.predict:
         print("Predicting devel and test samples...")
@@ -519,7 +530,8 @@ def main(args):
             eval_fn=eval_fn,
             use_gpu=args.use_gpu,
             predict=True,
-            prediction_path=os.path.join(args.paths["predict"], str(args.seed)),
+            prediction_path=os.path.join(
+                args.paths["predict"], str(args.seed)),
             filename="predictions_devel.csv",
         )
         evaluate(
@@ -530,7 +542,8 @@ def main(args):
             eval_fn=eval_fn,
             use_gpu=args.use_gpu,
             predict=True,
-            prediction_path=os.path.join(args.paths["predict"], str(args.seed)),
+            prediction_path=os.path.join(
+                args.paths["predict"], str(args.seed)),
             filename="predictions_test.csv",
         )
         print(
@@ -540,13 +553,16 @@ def main(args):
         )
 
     if args.optuna:
-        study = optuna.create_study(direction="maximize", sampler=TPESampler())
-        study.optimize(objective, n_trials=100)  # Adjust the number of trials as needed
+        study = optuna.create_study(
+            direction="maximize",
+            storage=f"sqlite:///{os.path.join('logs', f'{args.task}_optuna.db')}",
+            sampler=TPESampler())
+        # Adjust the number of trials as needed
+        study.optimize(objective, n_trials=100)
 
         # print best value and best params
         print(f"Best value: {study.best_value}")
         print(f"Best hyperparameters:{study.best_params}")
-    
 
         # Set the best hyperparameters to args
         for key, value in study.best_params.items():
@@ -554,14 +570,14 @@ def main(args):
 
         # save the best value and hyperparameters into csv via loggin
         log = logging.getLogger("optuna")
-        log_dir = os.path.join(args.paths["logs"], "optuna")
+        log_dir = os.path.join("logs", "optuna")
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         log_file = os.path.join(log_dir, f"{args.log_file_name}.log")
         handler = logging.FileHandler(log_file)
         handler.setLevel(logging.INFO)
         log.info(f"Label: {args.label_dim}")
-        log.info(f"Best value: {study.best_value}")
+        # log.info(f"Best value: {study.best_value}")
         # log.info(f"Args: {args}")
         log.info(f"Best hyperparameters:{study.best_params}")
         log.info("-----------------------------------------")
@@ -574,7 +590,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     args.log_file_name = "{}_{}_[{}]_[{}_{}_{}_{}]_[{}_{}]".format(
-        "RNN",
+        args.rnn_type,
         datetime.now(tz=tz.gettz()).strftime("%Y-%m-%d-%H-%M"),
         args.feature.replace(os.path.sep, "-"),
         args.model_dim,
@@ -624,17 +640,18 @@ if __name__ == "__main__":
         }
     )
 
-    sys.stdout = Logger(os.path.join(args.paths["log"], args.log_file_name + ".txt"))
+    sys.stdout = Logger(os.path.join(
+        args.paths["log"], args.log_file_name + ".txt"))
     print(" ".join(sys.argv))
 
     # set timer
     start = datetime.now()
     print("Start time: {}".format(start.strftime("%Y-%m-%d %H:%M:%S")))
-    
+
     main(args)
-    
+
     print("End time: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     print("Elapsed time: {}".format(datetime.now() - start))
     print("DONE.", flush=True)
-    
+
     # os.system(f"rm -r {config.OUTPUT_PATH}")

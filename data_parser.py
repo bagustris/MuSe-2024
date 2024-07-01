@@ -49,12 +49,13 @@ def get_all_training_csvs(task, feature) -> List[str]:
         if task == PERCEPTION:
             csvs.append(os.path.join(feature_dir, f'{subject}.csv'))
         elif task == HUMOR:
-            csvs.extend(sorted(glob(os.path.join(feature_dir, subject, "*.csv"))))
+            csvs.extend(
+                sorted(glob(os.path.join(feature_dir, subject, "*.csv"))))
 
     return csvs
 
 
-def fit_normalizer(task:str, feature:str, feature_idx=2) -> StandardScaler:
+def fit_normalizer(task: str, feature: str, feature_idx=2) -> StandardScaler:
     """
     Fits a sklearn StandardScaler based on training data
     :param task: task
@@ -65,10 +66,11 @@ def fit_normalizer(task:str, feature:str, feature_idx=2) -> StandardScaler:
     """
     # load training subjects
     training_csvs = get_all_training_csvs(task, feature)
-    #print(f"All training csvs: {training_csvs}")
-    df = pd.concat([pd.read_csv(training_csv) for training_csv in training_csvs])
+    # print(f"All training csvs: {training_csvs}")
+    df = pd.concat([pd.read_csv(training_csv)
+                   for training_csv in training_csvs])
     values = df.iloc[:, feature_idx:].values
-    #print(f'Scaling values')
+    # print(f'Scaling values')
     normalizer = StandardScaler().fit(values)
     return normalizer
 
@@ -91,17 +93,21 @@ def load_humor_subject(feature, subject_id, normalizer) -> Tuple[List[np.ndarray
     # parse labels
     label_path = PATH_TO_LABELS[HUMOR]
     label_files = sorted(glob(os.path.join(label_path, subject_id + '/*.csv')))
-    assert len(label_files) > 0, f'Error: no available humor label files for coach "{subject_id}": "{label_files}".'
-    label_df = pd.concat([pd.read_csv(label_file) for label_file in label_files])
+    assert len(
+        label_files) > 0, f'Error: no available humor label files for coach "{subject_id}": "{label_files}".'
+    label_df = pd.concat([pd.read_csv(label_file)
+                         for label_file in label_files])
 
     # idx of the data frame (column) where features start
     feature_idx = 2
     feature_path = PATH_TO_FEATURES[HUMOR]
 
-    feature_files = sorted(glob(os.path.join(feature_path, feature, subject_id + '/*.csv')))
+    feature_files = sorted(
+        glob(os.path.join(feature_path, feature, subject_id + '/*.csv')))
     assert len(
         feature_files) > 0, f'Error: no available "{feature}" feature files for coach "{subject_id}": "{feature_files}".'
-    feature_df = pd.concat([pd.read_csv(feature_file) for feature_file in feature_files])
+    feature_df = pd.concat([pd.read_csv(feature_file)
+                           for feature_file in feature_files])
     if not (normalizer is None):
         feature_values = feature_df.iloc[:, feature_idx:].values
         feature_df.iloc[:, feature_idx:] = normalizer.transform(feature_values)
@@ -154,7 +160,8 @@ def load_perception_subject(feature, subject_id, normalizer, label_dim) -> Tuple
 
     label_path = PATH_TO_LABELS[PERCEPTION]
     labels_df = pd.read_csv(label_path)
-    label_values = labels_df[(labels_df.subj_id==int(subject_id))][label_dim].values
+    label_values = labels_df[(
+        labels_df.subj_id == int(subject_id))][label_dim].values
     assert len(label_values) == 1
     label = np.array([[label_values[0]]])
 
@@ -178,14 +185,15 @@ def load_perception_subject(feature, subject_id, normalizer, label_dim) -> Tuple
 
 ################# LOAD DATASETS USING THE SPECIFIC METHODS ABOVE #############################################
 
-def load_data(task:str,
-              paths:Dict[str, str],
-              feature:str,
+def load_data(task: str,
+              paths: Dict[str, str],
+              feature: str,
               label_dim: Optional[str],
               normalize: Optional[Union[bool, StandardScaler]] = True,
               save=False,
               ids: Optional[Dict[str, List[str]]] = None,
-              data_file_suffix: Optional[str]=None) \
+              data_file_suffix: Optional[str] = None,
+              balance_humor: bool = False) \
         -> Dict[str, Dict[str, List[np.ndarray]]]:
     """
     Loads the complete data sets
@@ -218,11 +226,13 @@ def load_data(task:str,
     data = {'train': {'feature': [], 'label': [], 'meta': []},
             'devel': {'feature': [], 'label': [], 'meta': []},
             'test': {'feature': [], 'label': [], 'meta': []}}
-    subject2partition, partition2subject = get_data_partition(paths['partition'])
+    subject2partition, partition2subject = get_data_partition(
+        paths['partition'])
 
-    if not(normalize is None):
+    if not (normalize is None):
         if type(normalize) == bool:
-                normalizer = fit_normalizer(task=task, feature=feature) if normalize else None
+            normalizer = fit_normalizer(
+                task=task, feature=feature) if normalize else None
         else:
             normalizer = normalize
     else:
@@ -231,18 +241,44 @@ def load_data(task:str,
         if ids:
             subject_ids = [s for s in subject_ids if s in ids[partition]]
 
-
         for subject_id in tqdm(subject_ids):
             if task == HUMOR:
                 features, labels, metas = load_humor_subject(feature=feature, subject_id=subject_id,
                                                              normalizer=normalizer)
             elif task == PERCEPTION:
                 features, labels, metas = load_perception_subject(feature=feature, subject_id=subject_id,
-                                                                normalizer=normalizer, label_dim=label_dim)
+                                                                  normalizer=normalizer, label_dim=label_dim)
 
             data[partition]['feature'].extend(features)
             data[partition]['label'].extend(labels)
             data[partition]['meta'].extend(metas)
+
+    if balance_humor and task == HUMOR and partition == 'train':
+        # Count the number of samples for each label
+        label_counts = {0: 0, 1: 0}
+        for label in data[partition]['label']:
+            label_counts[label[0]] += 1
+
+        # Determine the minority and majority classes
+        minority_class = 0 if label_counts[0] < label_counts[1] else 1
+        majority_class = 1 - minority_class
+
+        # Oversample the minority class
+        minority_indices = [i for i, label in enumerate(
+            data[partition]['label']) if label[0] == minority_class]
+        oversampled_features = [data[partition]['feature'][i]
+                                for i in minority_indices]
+        oversampled_labels = [data[partition]['label'][i]
+                              for i in minority_indices]
+        oversampled_metas = [data[partition]['meta'][i]
+                             for i in minority_indices]
+
+        num_oversamples = label_counts[majority_class] - \
+            label_counts[minority_class]
+        data[partition]['feature'].extend(
+            oversampled_features[:num_oversamples])
+        data[partition]['label'].extend(oversampled_labels[:num_oversamples])
+        data[partition]['meta'].extend(oversampled_metas[:num_oversamples])
 
     if save:  # save loaded and preprocessed data
         print('Saving data...')

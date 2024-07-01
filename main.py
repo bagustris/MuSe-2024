@@ -73,8 +73,8 @@ def parse_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=200,
-        help="Specify the number of epochs (default: 200).",
+        default=1000,
+        help="Specify the number of epochs (default: 1000).",
     )
     parser.add_argument(
         "--batch_size",
@@ -144,13 +144,13 @@ def parse_args():
         default=None,
         help="Specify seed to be evaluated; only considered when --eval_model is given.",
     )
-    # add argument for loss function, default to mase, choices: mae, ccc, pcc
+    # add argument for loss function, default to mse, choices: mae, ccc, pcc
     parser.add_argument(
         "--loss",
         type=str,
         default="mse",
-        choices=["mse", "mae", "ccc", "pcc"],
-        help="Specify the loss function to be used (default: mse).",
+        choices=["mse", "mae", "ccc", "pcc", "bce"],
+        help="Specify the loss function to be used (default: mse) for perception task.",
     )
 
     # add argument for rnn_type, default to gru, choices: lstm, rnn
@@ -176,6 +176,13 @@ def parse_args():
         "--residual",
         action="store_true",
         help="Specify whether to use residual connections in the RNN (default: False).",
+    )
+
+    # add balancing argument for humor
+    parser.add_argument(
+        "--balance_humor",
+        action="store_true",
+        help="Specify whether to balance humor data (default: False). Only works for humo task.",
     )
 
     # use optuna to tune hyperparameters above
@@ -215,7 +222,8 @@ def ccc_loss(preds, labels):
 
 def get_loss_fn(task):
     if task == HUMOR:
-        return nn.BCELoss(), "Binary Crossentropy"
+        # https://github.com/NVIDIA/pix2pixHD/issues/9
+        return nn.BCEWithLogitsLoss(reduction="mean"), "Binary Crossentropy"
     elif task == PERCEPTION:
         if args.loss == "mse":
             return nn.MSELoss(reduction="mean"), "MSE"
@@ -251,11 +259,14 @@ def objective(trial):
         "regularization", 1e-5, 1e-2, log=True)
     args.rnn_type = trial.suggest_categorical(
         "rnn_type", ["lstm", "gru", "rnn"])
-    args.patience = trial.suggest_int("patience", 5, 30)
-    args.max_epochs = trial.suggest_int("max_epochs", 10, 1000)
+    args.early_stopping_patience = trial.suggest_int(
+        "early_stopping_patience", 5, 30)
+    args.epochs = trial.suggest_int("epochs", 10, 1000)
     args.activation = trial.suggest_categorical(
         "activation", ["relu", "gelu", "elu", "leakyrelu", "prelu", "rrelu", "mish"])
     args.residual = trial.suggest_categorical("residual", [True, False])
+    args.balance_humor = trial.suggest_categorical(
+        "balance_humor", [True, False])
 
     # Load data, create datasets, define loss and evaluation functions
     data = load_data(
@@ -265,6 +276,7 @@ def objective(trial):
         args.label_dim,
         args.normalize,
         save=args.cache,
+        balance_humor=args.balance_humor,
     )
     datasets = {partition: MuSeDataset(data, partition)
                 for partition in data.keys()}
@@ -555,7 +567,7 @@ def main(args):
     if args.optuna:
         study = optuna.create_study(
             direction="maximize",
-            storage=f"sqlite:///{os.path.join('logs', f'{args.task}_optuna.db')}",
+            storage=f"sqlite:///{os.path.join('logs', f'{args.task}_{args.feature}_optuna.db')}",
             sampler=TPESampler())
         # Adjust the number of trials as needed
         study.optimize(objective, n_trials=100)
@@ -568,20 +580,11 @@ def main(args):
         for key, value in study.best_params.items():
             setattr(args, key, value)
 
-        # save the best value and hyperparameters into csv via loggin
-        log = logging.getLogger("optuna")
-        log_dir = os.path.join("logs", "optuna")
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-        log_file = os.path.join(log_dir, f"{args.log_file_name}.log")
-        handler = logging.FileHandler(log_file)
-        handler.setLevel(logging.INFO)
-        log.info(f"Label: {args.label_dim}")
-        # log.info(f"Best value: {study.best_value}")
-        # log.info(f"Args: {args}")
-        log.info(f"Best hyperparameters:{study.best_params}")
-        log.info("-----------------------------------------")
-
+        # save best hyperparameters to a file for each feature in logs/optuna
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        with open(os.path.join("logs/optuna/",
+                  f"{args.task}_{args.feature}_{current_date}_best_params.txt"), "w") as f:
+            f.write(str(study.best_params))
     print("Done.")
 
 
@@ -646,12 +649,12 @@ if __name__ == "__main__":
 
     # set timer
     start = datetime.now()
-    print("Start time: {}".format(start.strftime("%Y-%m-%d %H:%M:%S")))
+    print(f"Start time: {start.strftime('%Y-%m-%d %H:%M:%S')}")
 
     main(args)
 
-    print("End time: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    print("Elapsed time: {}".format(datetime.now() - start))
+    print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Elapsed time: {datetime.now() - start}")
     print("DONE.", flush=True)
 
     # os.system(f"rm -r {config.OUTPUT_PATH}")

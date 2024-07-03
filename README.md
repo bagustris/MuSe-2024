@@ -61,6 +61,23 @@ A checkpoint model can be loaded and evaluated as follows:
 main.py --task humor --feature faus --eval_model /your/checkpoint/directory/humor_faus/model_102.pth
 ``` 
 
+### Evaluate single model
+To evaluate single model, we can use `late_fusion.py` with a model for model_ids. For instance, we have a list of single model in variable `models`.
+
+```bash
+ for model in ${models[@]}; do python late_fusion.py --task perception --label_dim dominant --model_ids $model --seeds 107; done
+ ```
+ The `models` variable can be obtained from ouput directory and list them (using `ls`) and then pasted to terminal as follows:
+
+ ```bash
+ $ models=('gru_2024-06-28-20-00_[egemaps]_[125_1_True_32]_[0.0008314184545955257_64]'
+> 'gru_2024-06-28-20-06_[faus]_[102_1_False_83]_[0.0009465919851445551_256]'
+> 'gru_2024-06-28-20-09_[ds]_[99_3_False_51]_[0.000595530307014647_128]'
+> 'lstm_2024-06-28-19-35_[vit-fer]_[78_1_False_65]_[0.00032916684358508247_256]'
+> 'lstm_2024-06-28-19-59_[facenet512]_[121_2_True_51]_[0.00029315203097385074_256]'
+> 'lstm_2024-06-28-20-02_[w2v-msp]_[67_4_False_37]_[0.0004987280253678834_256]'
+> )
+```
 
 ### Late Fusion
 We utilize a simple late fusion approach, which averages different models' predictions. 

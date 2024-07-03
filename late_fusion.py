@@ -22,6 +22,13 @@ def parse_args():
         help='model ids')
     parser.add_argument('--seeds', nargs='+', required=True, help='seeds')
     parser.add_argument('--result_csv', required=False, type=str)
+    # add argument for for early fusion, mean, performance, max
+    parser.add_argument(
+        '--method', 
+        type=str, 
+        default='performance', 
+        choices=['mean','max', 'performance', 'log']
+    )
 
     args = parser.parse_args()
     # TODO add again
@@ -67,58 +74,74 @@ def parse_args():
 def create_humor_lf(df, weights=None):
     pred_arr = df[[c for c in df.columns if c.startswith(
         'prediction_')]].values
-    if weights is None:
-        # TODO auto-compute weights based on performance
-        labels = df['label'].values
-        eval_fn, _ = get_eval_fn(HUMOR)
-        weights = []
-        for i in range(pred_arr.shape[1]):
+    if args.method == 'max':
+        fused_preds = np.max(pred_arr, axis=1)
+    elif args.method =='mean':
+        fused_preds = np.mean(pred_arr, axis=1)
+    else:
+        if weights is None:
+            # auto-compute weights based on performance
+            labels = df['label'].values
+            eval_fn, _ = get_eval_fn(HUMOR)
+            weights = []
+            for i in range(pred_arr.shape[1]):
+                preds = pred_arr[:, i]
+                weights.append(max(eval_fn(preds, labels) - 0.5, 0))
+            print('Weights: ', weights)
+            # weights = [1.] * pred_arr.shape[1]
+            if all(w == 0 for w in weights):
+                print('Only zeros')
+                weights = [1/len(weights)] * len(weights)
+        weights = np.array(weights) / np.sum(weights)
+        for i, w in enumerate(weights.tolist()):
             preds = pred_arr[:, i]
-            # 0.5 chance
-            weights.append(max(eval_fn(preds, labels) - 0.5, 0))
-        print('Weights', weights)
-        if all(w == 0 for w in weights):
-            print('Only zeros')
-            weights = [1 / len(weights)] * len(weights)
-        #weights = [1.] * pred_arr.shape[1]
-    for i, w in enumerate(weights):
-        preds = pred_arr[:, i]
-        # normalise and weight
-        # preds = (preds - np.min(preds)) / (np.max(preds) - np.min(preds))
-        preds = w * preds
-        pred_arr[:, i] = preds
-    fused_preds = np.sum(pred_arr, axis=1)
-    labels = df['label'].values
-    return fused_preds, labels, weights
+            # normalise and weight
+            preds = (preds - np.min(preds)) / (np.max(preds) - np.min(preds))
+            preds = w * preds
+            pred_arr[:, i] = preds
+        fused_preds = np.sum(pred_arr, axis=1)
 
-
-def create_perception_lf(df, weights=None):
-    pred_arr = df[[c for c in df.columns if c.startswith(
-        'prediction')]].values
-    if weights is None:
-        # auto-compute weights based on performance
-        labels = df['label'].values
-        eval_fn, _ = get_eval_fn(PERCEPTION)
-        weights = []
-        for i in range(pred_arr.shape[1]):
-            preds = pred_arr[:, i]
-            weights.append(max(eval_fn(preds, labels), 0))
-        #print('Weights', weights)
-        #weights = [1.] * pred_arr.shape[1]
-        if all(w == 0 for w in weights):
-            print('Only zeros')
-            weights = [1 / len(weights)] * len(weights)
-    weights = np.array(weights) / np.sum(weights)
-    for i, w in enumerate(weights.tolist()):
-        preds = pred_arr[:, i]
-        preds = w * preds
-        pred_arr[:, i] = preds
-    fused_preds = np.sum(pred_arr, axis=1)
     if partition == 'devel':
         labels = df['label'].values
         return fused_preds, labels, weights
     else:
         return fused_preds, None, weights
+
+def create_perception_lf(df, weights=None):
+    pred_arr = df[[c for c in df.columns if c.startswith('prediction')]].values
+    if args.method == 'max':
+        fused_preds = np.max(pred_arr, axis=1)
+    elif args.method == 'mean':
+        fused_preds = np.mean(pred_arr, axis=1)
+    elif args.method == 'log':
+        fused_preds = np.log(np.sum(np.exp(pred_arr), axis=1))
+    else: # performance and enhanced
+        if weights is None:
+            # auto-compute weights based on performance
+            labels = df['label'].values
+            eval_fn,_ = get_eval_fn(PERCEPTION)
+            weights = []
+            for i in range(pred_arr.shape[1]):
+                preds = pred_arr[:,i]
+                weights.append(max(eval_fn(preds, labels), 0))
+            print('Weights', weights)
+            #weights = [1.] * pred_arr.shape[1]
+            if all(w==0 for w in weights):
+                print('Only zeros')
+                weights = [1/len(weights)] * len(weights)
+        weights = np.array(weights) / np.sum(weights)
+        for i, w in enumerate(weights.tolist()):
+            preds = pred_arr[:, i]
+            preds = (preds - np.min(preds)) / (np.max(preds) - np.min(preds))
+            preds = w * preds
+            pred_arr[:, i] = preds
+        fused_preds = np.sum(pred_arr, axis=1)
+    if partition == 'devel':
+        labels = df['label'].values
+        return fused_preds, labels, weights
+    else:
+        return fused_preds, None, weights
+
 
 if __name__ == '__main__':
     args = parse_args()
@@ -167,18 +190,41 @@ if __name__ == '__main__':
         elif args.task == PERCEPTION:
             preds, labels, weights = create_perception_lf(
                 full_df, weights=weights)
-            # save fused prediction to new csv for test set
-            if partition == 'test':
-                new_df = full_df.copy()
-                new_df['prediction'] = preds
-                new_df.to_csv(
-                    os.path.join(
-                        LOG_FOLDER,
-                        'lf_results',
-                        args.task if args.task == HUMOR else f'{args.task}/{args.label_dim}',
-                        f'predictions_{partition}_lf.csv'),
-                        index=False)
             
+        if not os.path.exists(os.path.join(LOG_FOLDER, 
+            'lf_results',                         
+            args.task if args.task == HUMOR else f'{args.task}/{args.label_dim}')):
+            os.makedirs(os.path.join(LOG_FOLDER, 
+                'lf_results', 
+                    args.task if args.task == HUMOR else f'{args.task}/{args.label_dim}'),
+                    exist_ok=True)
+        
+        # save fused prediction to new csv for devel set
+        if partition == 'devel':
+            new_df = full_df.copy()
+            new_df['prediction'] = preds
+            # new_df['truth'] = labels
+            # crate lf_results folder if not exist
+            new_df.to_csv(
+                os.path.join(
+                    LOG_FOLDER,
+                    'lf_results',
+                    args.task if args.task == HUMOR else f'{args.task}/{args.label_dim}',
+                    f'predictions_{partition}_lf.csv'),
+                    index=False)
+        # save fused prediction to new csv for test set
+        if partition == 'test':
+            new_df = full_df.copy()
+            new_df['prediction'] = preds
+            # crate lf_results folder if not exist
+            new_df.to_csv(
+                os.path.join(
+                    LOG_FOLDER,
+                    'lf_results',
+                    'humor' if args.task == HUMOR else f'{args.task}/{args.label_dim}',
+                    f'predictions_{partition}_lf.csv'),
+                    index=False)
+        
 
         eval_fn, eval_str = get_eval_fn(args.task)
 
@@ -200,4 +246,5 @@ if __name__ == '__main__':
             old_df = pd.read_csv(args.result_csv)
             df = pd.concat([old_df, df], axis='rows').reset_index(drop=True)
         df.to_csv(args.result_csv, index=False)
+        # save metadata of prediction of test set to csv
         print(f'Saved to {args.result_csv}')

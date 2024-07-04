@@ -62,7 +62,7 @@ def parse_args():
     if args.result_csv is not None:
         args.result_csv = os.path.join(
             LOG_FOLDER,
-            'lf_results',
+            'lf_metadata',
             args.task if args.task == HUMOR else f'{args.task}/{args.label_dim}',
             args.result_csv)
         os.makedirs(os.path.dirname(args.result_csv), exist_ok=True)
@@ -123,7 +123,9 @@ def create_perception_lf(df, weights=None):
             weights = []
             for i in range(pred_arr.shape[1]):
                 preds = pred_arr[:,i]
-                weights.append(max(eval_fn(preds, labels), 0))
+                # sorting only for performance higher than 0.3
+                eval_per = eval_fn(preds, labels)
+                weights.append(max(eval_per, 0))
             print('Weights', weights)
             #weights = [1.] * pred_arr.shape[1]
             if all(w==0 for w in weights):
@@ -185,17 +187,17 @@ if __name__ == '__main__':
         else:
             full_df = pd.concat([meta_df, prediction_df], axis='columns')
             
-        if args.task == 'humor':
+        if args.task == HUMOR:
             preds, labels, weights = create_humor_lf(full_df, weights=weights)
         elif args.task == PERCEPTION:
             preds, labels, weights = create_perception_lf(
                 full_df, weights=weights)
             
-        if not os.path.exists(os.path.join(LOG_FOLDER, 
-            'lf_results',                         
+        if not os.path.exists(os.path.join(PREDICTION_FOLDER, 
+            'lf',                         
             args.task if args.task == HUMOR else f'{args.task}/{args.label_dim}')):
-            os.makedirs(os.path.join(LOG_FOLDER, 
-                'lf_results', 
+            os.makedirs(os.path.join(PREDICTION_FOLDER, 
+                'lf', 
                     args.task if args.task == HUMOR else f'{args.task}/{args.label_dim}'),
                     exist_ok=True)
         
@@ -203,12 +205,11 @@ if __name__ == '__main__':
         if partition == 'devel':
             new_df = full_df.copy()
             new_df['prediction'] = preds
-            # new_df['truth'] = labels
             # crate lf_results folder if not exist
             new_df.to_csv(
                 os.path.join(
-                    LOG_FOLDER,
-                    'lf_results',
+                    PREDICTION_FOLDER,
+                    'lf',
                     args.task if args.task == HUMOR else f'{args.task}/{args.label_dim}',
                     f'predictions_{partition}_lf.csv'),
                     index=False)
@@ -219,8 +220,8 @@ if __name__ == '__main__':
             # crate lf_results folder if not exist
             new_df.to_csv(
                 os.path.join(
-                    LOG_FOLDER,
-                    'lf_results',
+                    PREDICTION_FOLDER,
+                    'lf',
                     'humor' if args.task == HUMOR else f'{args.task}/{args.label_dim}',
                     f'predictions_{partition}_lf.csv'),
                     index=False)

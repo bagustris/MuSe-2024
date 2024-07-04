@@ -21,7 +21,7 @@ from utils import Logger, seed_worker, log_results
 import optuna
 from optuna.samplers import TPESampler
 
-import logging
+# import logging
 
 
 def parse_args():
@@ -73,8 +73,8 @@ def parse_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=1000,
-        help="Specify the number of epochs (default: 1000).",
+        default=100,
+        help="Specify the number of epochs (default: 100).",
     )
     parser.add_argument(
         "--batch_size",
@@ -91,7 +91,7 @@ def parse_args():
     parser.add_argument(
         "--seed",
         type=int,
-        default=107,
+        default=101,
         help="Specify the initial random seed (default: 101).",
     )
     parser.add_argument(
@@ -125,8 +125,9 @@ def parse_args():
     parser.add_argument(
         "--predict",
         action="store_true",
-        help="Specify when no test labels are available; test predictions will be saved "
-        "(default: False). Incompatible with result_csv",
+        help="Specify when no test labels are available; "
+             "test predictions will be saved "
+             "(default: False). Incompatible with result_csv",
     )
     parser.add_argument(
         "--regularization", type=float, required=False, default=0.0, help="L2-Penalty"
@@ -136,19 +137,21 @@ def parse_args():
         "--eval_model",
         type=str,
         default=None,
-        help="Specify model which is to be evaluated; no training with this option (default: False).",
+        help="Specify model which is to be evaluated; "
+             "no training with this option (default: False).",
     )
     parser.add_argument(
         "--eval_seed",
         type=str,
         default=None,
-        help="Specify seed to be evaluated; only considered when --eval_model is given.",
+        help="Specify seed to be evaluated; "
+             "only considered when --eval_model is given.",
     )
     # add argument for loss function, default to mse, choices: mae, ccc, pcc
     parser.add_argument(
         "--loss",
         type=str,
-        default="mse",
+        default="mse" if PERCEPTION else "bce",
         choices=["mse", "mae", "ccc", "pcc", "bce"],
         help="Specify the loss function to be used (default: mse) for perception task.",
     )
@@ -182,7 +185,7 @@ def parse_args():
     parser.add_argument(
         "--balance_humor",
         action="store_true",
-        help="Specify whether to balance humor data (default: False). Only works for humo task.",
+        help="Specify whether to balance humor data (default: False). Only works for humor task.",
     )
 
     # use optuna to tune hyperparameters above
@@ -196,6 +199,10 @@ def parse_args():
     if args.result_csv is not None and args.predict:
         print("--result_csv is not compatible with --predict")
         sys.exit(-1)
+    elif args.task == "perception" and args.balance_humor:
+        print("--balance_humor is not compatible with perception task")
+        sys.exit(-1)
+
     if args.eval_model:
         assert args.eval_seed
     return args
@@ -223,7 +230,7 @@ def ccc_loss(preds, labels):
 def get_loss_fn(task):
     if task == HUMOR:
         # https://github.com/NVIDIA/pix2pixHD/issues/9
-        return nn.BCEWithLogitsLoss(reduction="mean"), "Binary Crossentropy"
+        return nn.BCEWithLogitsLoss(), "Binary Crossentropy"
     elif task == PERCEPTION:
         if args.loss == "mse":
             return nn.MSELoss(reduction="mean"), "MSE"
@@ -366,7 +373,7 @@ def main(args):
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    # emo_dim only relevant for stress/personalisation
+    # label_dim is only for perception
     args.label_dim = args.label_dim if args.task == PERCEPTION else ""
     print("Loading data ...")
     args.paths["partition"] = os.path.join(
@@ -534,30 +541,21 @@ def main(args):
     if args.predict:
         print("Predicting devel and test samples...")
         best_model = torch.load(model_file, map_location=config.device)
-        evaluate(
-            args.task,
-            best_model,
-            data_loader["devel"],
-            loss_fn=loss_fn,
-            eval_fn=eval_fn,
-            use_gpu=args.use_gpu,
-            predict=True,
-            prediction_path=os.path.join(
-                args.paths["predict"], str(args.seed)),
-            filename="predictions_devel.csv",
-        )
-        evaluate(
-            args.task,
-            best_model,
-            data_loader["test"],
-            loss_fn=loss_fn,
-            eval_fn=eval_fn,
-            use_gpu=args.use_gpu,
-            predict=True,
-            prediction_path=os.path.join(
-                args.paths["predict"], str(args.seed)),
-            filename="predictions_test.csv",
-        )
+        # predict all
+        for split in ["train", "devel", "test"]:
+            evaluate(
+                args.task,
+                best_model,
+                data_loader[split],
+                loss_fn=loss_fn,
+                eval_fn=eval_fn,
+                use_gpu=args.use_gpu,
+                predict=True,
+                prediction_path=os.path.join(
+                    args.paths["predict"], str(args.seed)),
+                filename=f"predictions_{split}.csv",
+            )
+
         print(
             "Find predictions in {}".format(
                 os.path.join(args.paths["predict"], str(args.seed))

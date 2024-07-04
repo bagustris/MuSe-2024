@@ -551,15 +551,11 @@ def main(args):
                 eval_fn=eval_fn,
                 use_gpu=args.use_gpu,
                 predict=True,
-                prediction_path=os.path.join(
-                    args.paths["predict"], str(args.seed)),
+                prediction_path=args.paths["predict"],
                 filename=f"predictions_{split}.csv",
             )
 
-        print(
-            "Find predictions in {}".format(
-                os.path.join(args.paths["predict"], str(args.seed))
-            )
+        print(f'Find predictions in {os.path.join(args.paths["predict"])}'
         )
 
     if args.optuna:

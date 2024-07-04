@@ -120,7 +120,7 @@ for label in "${labels[@]}"; do
     echo processing late fusion for "$label" with "$label"_model_ids
     
     # Use the specific model_ids for each label
-    python late_fusion.py --task perception --label_dim "$label" --model_ids ${!model_ids_var} --seeds 107 --method log
+    python late_fusion.py --task perception --label_dim "$label" --model_ids ${!model_ids_var} --seeds 107
 
 done
 

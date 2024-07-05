@@ -56,3 +56,6 @@ LOG_FOLDER = os.path.join(OUTPUT_PATH, 'log_muse')
 DATA_FOLDER = os.path.join(OUTPUT_PATH, 'data_muse')
 MODEL_FOLDER = os.path.join(OUTPUT_PATH, 'model_muse')
 PREDICTION_FOLDER = os.path.join(OUTPUT_PATH, 'prediction_muse')
+# extract models from the organizer (baseline) to this path
+PERCEPTION_MODELS = os.path.join(BASE_PATH, 'perception_models')
+

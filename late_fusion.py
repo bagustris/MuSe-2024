@@ -115,7 +115,7 @@ def create_perception_lf(df, weights=None):
         fused_preds = np.mean(pred_arr, axis=1)
     elif args.method == 'log':
         fused_preds = np.log(np.sum(np.exp(pred_arr), axis=1))
-    else: # performance and enhanced
+    else: # performance
         if weights is None:
             # auto-compute weights based on performance
             labels = df['label'].values
@@ -123,10 +123,10 @@ def create_perception_lf(df, weights=None):
             weights = []
             for i in range(pred_arr.shape[1]):
                 preds = pred_arr[:,i]
-                # sorting only for performance higher than 0.3
+                # use all models for perception
                 eval_per = eval_fn(preds, labels)
                 weights.append(max(eval_per, 0))
-            print('Weights', weights)
+            print('Weights: ', weights)
             #weights = [1.] * pred_arr.shape[1]
             if all(w==0 for w in weights):
                 print('Only zeros')

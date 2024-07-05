@@ -5,7 +5,7 @@ __pycache__
 hp_search
 preds
 baseline_results
-venv/
+.venv/
 *.csv
 *.envrc
 *#

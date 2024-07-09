@@ -21,6 +21,9 @@ from utils import Logger, seed_worker, log_results
 import optuna
 from optuna.samplers import TPESampler
 
+import numpy as np
+import scipy.signal
+
 # import logging
 
 
@@ -79,7 +82,7 @@ def parse_args():
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=256,
+        default=512,
         help="Specify the batch size (default: 256).",
     )
     parser.add_argument(
@@ -188,6 +191,13 @@ def parse_args():
         help="Specify whether to balance humor data (default: False). Only works for humor task.",
     )
 
+    # add data augmentation
+    parser.add_argument(
+        "--data_augmentation",
+        action="store_true",
+        help="Specify whether to use data augmentation (default: False).",
+    )
+    
     # use optuna to tune hyperparameters above
     parser.add_argument(
         "--optuna",
@@ -207,6 +217,68 @@ def parse_args():
         assert args.eval_seed
     return args
 
+def augment_data(features, labels):
+    augmented_features = []
+    augmented_labels = []
+    
+    for i, (feature, label) in enumerate(zip(features, labels)):
+        # Original sample
+        augmented_features.append(feature)
+        augmented_labels.append(label)
+        
+        # Noise injection
+        noise = np.random.normal(0, 0.01, feature.shape)
+        augmented_features.append(feature + noise)
+        augmented_labels.append(label)
+        
+        # Time warping
+        time_warp_factor = np.random.uniform(0.8, 1.2)
+        time_warped = scipy.signal.resample(feature, int(feature.shape[0] * time_warp_factor))
+        if time_warped.shape[0] > feature.shape[0]:
+            time_warped = time_warped[:feature.shape[0]]
+        else:
+            time_warped = np.pad(time_warped, ((0, feature.shape[0] - time_warped.shape[0]), (0, 0)), mode='edge')
+        augmented_features.append(time_warped)
+        augmented_labels.append(label)
+        
+        # Magnitude warping
+        magnitude_warp = feature * np.random.uniform(0.8, 1.2, size=feature.shape)
+        augmented_features.append(magnitude_warp)
+        augmented_labels.append(label)
+
+        # Mixup
+        if i < len(features) - 1:
+            # The alpha parameter in Mixup controls the strength of interpolation. 
+            # A smaller value (like 0.2) will result in mixtures closer to the original samples.
+            alpha = 0.2
+            lam = np.random.beta(alpha, alpha)
+            mixed_feature = lam * feature + (1 - lam) * features[i+1]
+            mixed_label = lam * label + (1 - lam) * labels[i+1]
+            augmented_features.append(mixed_feature)
+            augmented_labels.append(mixed_label)
+        
+        # CutMix
+        if i < len(features) - 1:
+            # For CutMix, we're using a simple rectangular cut. 
+            # The size and position of the cut are randomly determined.
+            lam = np.random.beta(1, 1)
+            cut_ratio = np.sqrt(1 - lam)
+            h, w = feature.shape
+            cut_h, cut_w = int(h * cut_ratio), int(w * cut_ratio)
+            cx, cy = np.random.randint(w), np.random.randint(h)
+            
+            bbx1, bby1 = np.clip(cx - cut_w // 2, 0, w), np.clip(cy - cut_h // 2, 0, h)
+            bbx2, bby2 = np.clip(cx + cut_w // 2, 0, w), np.clip(cy + cut_h // 2, 0, h)
+            
+            cutmix_feature = feature.copy()
+            cutmix_feature[bby1:bby2, bbx1:bbx2] = features[i+1][bby1:bby2, bbx1:bbx2]
+            
+            cutmix_label = lam * label + (1 - lam) * labels[i+1]
+            
+            augmented_features.append(cutmix_feature)
+            augmented_labels.append(cutmix_label)
+    
+    return np.array(augmented_features), np.array(augmented_labels)
 
 def pcc_loss(preds, labels):
     """Pearson correlation coefficient loss """
@@ -283,6 +355,7 @@ def objective(trial):
         args.label_dim,
         args.normalize,
         save=args.cache,
+        data_augmentation=args.data_augmentation,
         balance_humor=args.balance_humor,
     )
     datasets = {partition: MuSeDataset(data, partition)
@@ -551,7 +624,7 @@ def main(args):
                 eval_fn=eval_fn,
                 use_gpu=args.use_gpu,
                 predict=True,
-                prediction_path=args.paths["predict"],
+                prediction_path=os.path.join(args.paths["predict"], str(args.seed)),
                 filename=f"predictions_{split}.csv",
             )
 

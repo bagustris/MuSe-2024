@@ -3,6 +3,7 @@ import os
 import numpy as np
 import torch
 import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from eval import evaluate
 
@@ -47,11 +48,15 @@ def save_model(model, model_folder, id):
 
 
 def train_model(task, model, data_loader, epochs, lr, model_path, identifier, 
-                use_gpu, loss_fn, eval_fn,
-                eval_metric_str, early_stopping_patience, regularization=0.0):
+                use_gpu, loss_fn, eval_fn, eval_metric_str, early_stopping_patience, 
+                regularization=0.0):
     train_loader, val_loader, test_loader = data_loader['train'], data_loader['devel'], data_loader['test']
 
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=regularization)
+    
+    # Initialize the ReduceLROnPlateau scheduler
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5, verbose=True)
+
     best_val_loss = float('inf')
     best_val_score = -1
     best_model_file = ''
@@ -71,7 +76,6 @@ def train_model(task, model, data_loader, epochs, lr, model_path, identifier,
             best_val_score = val_score
             best_val_loss = val_loss
             best_model_file = save_model(model, model_path, identifier)
-
         else:
             early_stop += 1
             if early_stop >= early_stopping_patience:
@@ -79,6 +83,13 @@ def train_model(task, model, data_loader, epochs, lr, model_path, identifier,
                       f'early stop the training process!')
                 print('-' * 50)
                 break
+
+        # Step the scheduler
+        scheduler.step(val_score)
+
+        # Print current learning rate
+        current_lr = optimizer.param_groups[0]['lr']
+        print(f'Current Learning Rate: {current_lr:.6f}')
 
     print(f'ID/Seed {identifier} | '
           f'Best [Val {eval_metric_str}]:{best_val_score:>7.4f} | Loss: {best_val_loss:>.4f}')

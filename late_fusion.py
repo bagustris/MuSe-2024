@@ -147,7 +147,8 @@ def create_perception_lf(df, weights=None):
 
 if __name__ == '__main__':
     args = parse_args()
-    ress = []
+    print(f"Task: {args.task}, method: {args.method}")
+    ress = []       # hook for results
     weights = None  # gets set to devel weights at first call
     for partition in ['devel', 'test']:
         dfs = [

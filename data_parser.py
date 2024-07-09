@@ -193,6 +193,7 @@ def load_data(task: str,
               save=False,
               ids: Optional[Dict[str, List[str]]] = None,
               data_file_suffix: Optional[str] = None,
+              data_augmentation: bool = False,
               balance_humor: bool = False) \
         -> Dict[str, Dict[str, List[np.ndarray]]]:
     """
@@ -252,6 +253,14 @@ def load_data(task: str,
             data[partition]['feature'].extend(features)
             data[partition]['label'].extend(labels)
             data[partition]['meta'].extend(metas)
+
+    
+    if data_augmentation and partition == 'train':
+        augmented_features, augmented_labels = augment_data(features, labels)
+        features = np.concatenate([features, augmented_features])
+        labels = np.concatenate([labels, augmented_labels])
+    
+    # ... (rest of the existing code)
 
     if balance_humor and task == HUMOR and partition == 'train':
         # Count the number of samples for each label

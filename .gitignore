@@ -11,3 +11,14 @@ bak
 *.envrc
 *#
 test_scripts/
+.env/
+*.bak*
+log/
+logs/
+*.zip
+*.db
+*.sqlite3
+.vscode/
+.*
+*.csv
+*.tsv

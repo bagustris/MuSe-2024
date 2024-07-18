@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import pandas as pd
 import numpy as np
 
-from config import TASKS, PREDICTION_FOLDER, HUMOR, PERCEPTION_LABELS, PERCEPTION, LOG_FOLDER
+from config import TASKS, PREDICTION_FOLDER, HUMOR, PERCEPTION_LABELS, PERCEPTION, LOG_FOLDER, PERCEPTION_MODELS
 from main import get_eval_fn
 
 
@@ -19,8 +19,8 @@ def parse_args():
         '--model_ids',
         nargs='+',
         required=True,
-        help='model ids')
-    parser.add_argument('--seeds', nargs='+', required=True, help='seeds')
+        help='model ids (ds  egemaps  facenet512  faus  vit  w2v-msp)')
+    parser.add_argument('--seeds', nargs='+', required=True, help='seeds (101)')
     parser.add_argument('--result_csv', required=False, type=str)
     # add argument for for early fusion, mean, performance, max
     parser.add_argument(
@@ -52,7 +52,7 @@ def parse_args():
     elif args.task == PERCEPTION:
         args.prediction_dirs = [
             os.path.join(
-                PREDICTION_FOLDER,
+                PERCEPTION_MODELS,
                 args.task,
                 args.label_dim,
                 args.model_ids[i],
@@ -107,43 +107,6 @@ def create_humor_lf(df, weights=None):
     else:
         return fused_preds, None, weights
 
-# def create_perception_lf(df, weights=None):
-#     pred_arr = df[[c for c in df.columns if c.startswith('prediction')]].values
-#     if args.method == 'max':
-#         fused_preds = np.max(pred_arr, axis=1)
-#     elif args.method == 'mean':
-#         fused_preds = np.mean(pred_arr, axis=1)
-#     elif args.method == 'log':
-#         fused_preds = np.log(np.sum(np.exp(pred_arr), axis=1))
-#     else: # performance
-#         if weights is None:
-#             # auto-compute weights based on performance
-#             labels = df['label'].values
-#             eval_fn,_ = get_eval_fn(PERCEPTION)
-#             weights = []
-#             for i in range(pred_arr.shape[1]):
-#                 preds = pred_arr[:,i]
-#                 # use all models for perception
-#                 eval_per = eval_fn(preds, labels)
-#                 weights.append(max(eval_per, 0))
-#             print('Weights: ', weights)
-#             #weights = [1.] * pred_arr.shape[1]
-#             if all(w==0 for w in weights):
-#                 print('Only zeros')
-#         -        weights = [1/len(weights)] * len(weights)
-#         weights = np.array(weights) / np.sum(weights)
-#         for i, w in enumerate(weights.tolist()):
-#             preds = pred_arr[:, i]
-#             # preds = (preds - np.min(preds)) / (np.max(preds) - np.min(preds))
-#             preds = w * preds
-#             pred_arr[:, i] = preds
-#         fused_preds = np.sum(pred_arr, axis=1)
-#     if partition == 'devel':
-#         labels = df['label'].values
-#         return fused_preds, labels, weights
-#     else:
-#         return fused_preds, None, weights
-
 def create_perception_lf(df, weights=None):
     pred_arr = df[[c for c in df.columns if c.startswith('prediction')]].values
     if args.method == 'max':
@@ -164,8 +127,7 @@ def create_perception_lf(df, weights=None):
                 eval_pers.append((eval_per, i))
             
             # Sort and select top-n eval_per values, use [:] for all
-            n = 2
-            top_n_eval_pers = sorted(eval_pers, reverse=True)[:n]
+            top_n_eval_pers = sorted(eval_pers, reverse=True)[:4]
 
             weights = [0] * pred_arr.shape[1]
             for eval_per, idx in top_n_eval_pers:
@@ -179,7 +141,6 @@ def create_perception_lf(df, weights=None):
         weights = np.array(weights) / np.sum(weights)
         for i, w in enumerate(weights.tolist()):
             preds = pred_arr[:, i]
-            # normalization, important!! comment to see the effect
             preds = (preds - np.min(preds)) / (np.max(preds) - np.min(preds))
             preds = w * preds
             pred_arr[:, i] = preds
@@ -194,8 +155,7 @@ def create_perception_lf(df, weights=None):
 
 if __name__ == '__main__':
     args = parse_args()
-    print(f"Task: {args.task}, method: {args.method}")
-    ress = []       # hook for results
+    ress = []
     weights = None  # gets set to devel weights at first call
     for partition in ['devel', 'test']:
         dfs = [

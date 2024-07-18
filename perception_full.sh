@@ -21,7 +21,7 @@ for feature in "${features[@]}"; do
     for num_rnn_layers in "${nums_rnn_layers[@]}"; do
         for model_dim in "${model_dims[@]}"; do
             for lr in "${lrs[@]}";do
-                for dropout in "${dropouts[@]}";do
+                for dropout in "${dropouts[@]}"; do
                     for label in "${labels[@]}"; do
                         python3 main.py --task perception --use_gpu --feature $feature --model_dim $model_dim --label_dim "$label" --rnn_n_layers $num_rnn_layers --lr "$lr" --n_seeds "$n_seeds" --predict --linear_dropout $dropout --rnn_dropout $dropout --early_stopping_patience $patience
                     done

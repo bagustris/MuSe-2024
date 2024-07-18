@@ -20,7 +20,7 @@ def parse_args():
         nargs='+',
         required=True,
         help='model ids')
-    parser.add_argument('--seeds', nargs='+', required=True, help='seeds')
+    # parser.add_argument('--seeds', nargs='+', required=True, help='seeds')
     parser.add_argument('--result_csv', required=False, type=str)
     # add argument for for early fusion, mean, performance, max
     parser.add_argument(
@@ -38,25 +38,23 @@ def parse_args():
     if args.task == PERCEPTION:
         assert args.label_dim
 
-    if args.seeds and len(args.seeds) == 1:
-        args.seeds = [args.seeds[0]] * len(args.model_ids)
-        assert len(args.model_ids) == len(args.seeds)
+    # if args.seeds and len(args.seeds) == 1:
+    #     args.seeds = [args.seeds[0]] * len(args.model_ids)
+    #     assert len(args.model_ids) == len(args.seeds)
 
     if args.task == HUMOR:
         args.prediction_dirs = [
             os.path.join(
                 PREDICTION_FOLDER,
                 args.task,
-                args.model_ids[i],
-                args.seeds[i]) for i in range(len(args.model_ids))]
+                args.model_ids[i]) for i in range(len(args.model_ids))]
     elif args.task == PERCEPTION:
         args.prediction_dirs = [
             os.path.join(
                 PREDICTION_FOLDER,
                 args.task,
                 args.label_dim,
-                args.model_ids[i],
-                args.seeds[i]) for i in range(len(args.model_ids)
+                args.model_ids[i]) for i in range(len(args.model_ids)
             )
         ]
     if args.result_csv is not None:
@@ -107,6 +105,7 @@ def create_humor_lf(df, weights=None):
     else:
         return fused_preds, None, weights
 
+
 # def create_perception_lf(df, weights=None):
 #     pred_arr = df[[c for c in df.columns if c.startswith('prediction')]].values
 #     if args.method == 'max':
@@ -130,7 +129,7 @@ def create_humor_lf(df, weights=None):
 #             #weights = [1.] * pred_arr.shape[1]
 #             if all(w==0 for w in weights):
 #                 print('Only zeros')
-#         -        weights = [1/len(weights)] * len(weights)
+#                 weights = [1/len(weights)] * len(weights)
 #         weights = np.array(weights) / np.sum(weights)
 #         for i, w in enumerate(weights.tolist()):
 #             preds = pred_arr[:, i]
@@ -143,6 +142,7 @@ def create_humor_lf(df, weights=None):
 #         return fused_preds, labels, weights
 #     else:
 #         return fused_preds, None, weights
+
 
 def create_perception_lf(df, weights=None):
     pred_arr = df[[c for c in df.columns if c.startswith('prediction')]].values
@@ -164,7 +164,7 @@ def create_perception_lf(df, weights=None):
                 eval_pers.append((eval_per, i))
             
             # Sort and select top-n eval_per values, use [:] for all
-            n = 2
+            n = 4
             top_n_eval_pers = sorted(eval_pers, reverse=True)[:n]
 
             weights = [0] * pred_arr.shape[1]
@@ -287,7 +287,7 @@ if __name__ == '__main__':
         df = pd.DataFrame({
             'models': [args.model_ids],
             'weights': [str(weights)],
-            'seeds': [args.seeds],
+            # 'seeds': [args.seeds],
             'devel': [ress[0]],
             # 'test': [ress[1]]
         })

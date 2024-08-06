@@ -1,4 +1,4 @@
-# MuSe-2024 Baseline Model: GRU Regressor
+# Evaluation of RNN Models for MuSe-2024
 
 
 [Homepage](https://www.muse-challenge.org) || [Baseline Paper](https://www.researchgate.net/publication/380664467_The_MuSe_2024_Multimodal_Sentiment_Analysis_Challenge_Social_Perception_and_Humor_Recognition)

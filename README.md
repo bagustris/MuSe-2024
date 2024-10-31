@@ -103,12 +103,25 @@ $ python late_fusion.py --task perception --label_dim assertiv --model_ids RNN_2
 python main.py --task perception --feature vit-fer --optuna
 ```
 
-### Model Checkpoints
-Checkpoints for the [Perception Sub-Challenge](https://mediastore.rz.uni-augsburg.de/get/Bm2Ds0KUNd/)
-Checkpoints for the [Humor Sub-Challenge](https://mediastore.rz.uni-augsburg.de/get/_Xvipe7oPO/)
-
 
 ##  Citation:
 
-The MuSe2024 baseline paper is only available in a preliminary version as of now: [https://www.researchgate.net/publication/380664467_The_MuSe_2024_Multimodal_Sentiment_Analysis_Challenge_Social_Perception_and_Humor_Recognition](https://www.researchgate.net/publication/380664467_The_MuSe_2024_Multimodal_Sentiment_Analysis_Challenge_Social_Perception_and_Humor_Recognition)
-
+```bibtex
+@inproceedings{10.1145/3689062.3689082,
+author = {Atmaja, Bagus Tris},
+title = {Feature-wise Optimization and Performance-weighted Multimodal Fusion for Social Perception Recognition},
+year = {2024},
+isbn = {9798400711992},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3689062.3689082},
+doi = {10.1145/3689062.3689082},
+abstract = {Automatic social perception recognition is a new task to mimic the measurement of human traits, which was previously done by humans via questionnaires. We evaluated unimodal and multimodal systems to predict agentive and communal traits from the LMU-ELP dataset. We optimized variants of recurrent neural networks from each feature from audio and video data and then fused them to predict the traits. Results on the development set show a consistent trend that multimodal fusion outperforms unimodal systems. The performance-weighted fusion also consistently outperforms mean and maximum fusions. We found two important factors that influence the performance of performance-weighted fusion. These factors are normalization and the number of models.},
+booktitle = {Proceedings of the 5th on Multimodal Sentiment Analysis Challenge and Workshop: Social Perception and Humor},
+pages = {28–35},
+numpages = {8},
+keywords = {multimodal fusion, parameter optimization, sentiment analysis, social perception},
+location = {Melbourne VIC, Australia},
+series = {MuSe'24}
+}
+```

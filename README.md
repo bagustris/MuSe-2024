@@ -1,5 +1,4 @@
-# Evaluation of RNN Models for MuSe-2024
-
+# Feature-wise Optimization and Performance-weighted Multimodal Fusion for Social Perception Recognition
 
 [Homepage](https://www.muse-challenge.org) || [Baseline Paper](https://www.researchgate.net/publication/380664467_The_MuSe_2024_Multimodal_Sentiment_Analysis_Challenge_Social_Perception_and_Humor_Recognition)
 
@@ -16,7 +15,7 @@ For details, please see the [Baseline Paper](https://www.researchgate.net/public
 
 
 ## Installation
-It is highly recommended to run everything in a Python virtual environment. Please make sure to install the packages listed 
+It is highly recommended that everything be run in a Python virtual environment. Please make sure to install the packages listed 
 in ``requirements.txt`` and adjust the paths in `config.py` (especially ``BASE_PATH`` and ``HUMOR_PATH`` and/or ``PERCEPTION_PATH``, respectively). 
 
 You can then, e.g., run the unimodal baseline reproduction calls in the ``*_bagus.sh`` file provided for each sub-challenge.  
@@ -62,12 +61,12 @@ main.py --task humor --feature faus --eval_model /your/checkpoint/directory/humo
 ``` 
 
 ### Evaluate single model
-To evaluate single model, we can use `late_fusion.py` with a model for model_ids. For instance, we have a list of single model in variable `models`.
+To evaluate a single model, we can use `late_fusion.py` with a model for model_ids. For instance, we have a list of single model in variable `models`.
 
 ```bash
  for model in ${models[@]}; do python late_fusion.py --task perception --label_dim dominant --model_ids $model --seeds 107; done
  ```
- The `models` variable can be obtained from ouput directory and list them (using `ls`) and then pasted to terminal as follows:
+ The `models` variable can be obtained from the output directory and list them (using `ls`) and then pasted to the terminal as follows:
 
  ```bash
  $ models=('gru_2024-06-28-20-00_[egemaps]_[125_1_True_32]_[0.0008314184545955257_64]'
@@ -89,7 +88,7 @@ Then, ``late_fusion.py`` merges these predictions:
 * ``--label_dim``: for MuSe-Perception, cf. ``PERCEPTION_LABELS`` in ``config.py``
 * ``--model_ids``: list of model IDs, whose predictions are to be merged. These predictions must first be created (``--predict`` in ``main.py`` or ``personalisation.py``). 
   The `model_id` is a folder under the ``{config.PREDICTION_DIR}/humor`` for humor and ``{config.PREDICTION_FOLDER}/perception/{label_dim}`` for perception. 
-  It is the parent folder of the folders named after the seeds (e.g. ``101``). These contain the files ``predictions_devel.csv`` and ``predictoins_test.csv``
+  It is the parent folder of the folders named after the seeds (e.g., ``101``). These contain the files ``predictions_devel.csv`` and ``predictoins_test.csv``
 * ``--seeds``: seeds for the respective model IDs.  
 
 Example:  
